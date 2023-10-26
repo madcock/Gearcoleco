@@ -22,7 +22,11 @@
 Audio::Audio()
 {
     m_ElapsedCycles = 0;
+#if !defined(SF2000)
     m_iSampleRate = 44100;
+#else
+    m_iSampleRate = 11025;
+#endif
     InitPointer(m_pApu);
     InitPointer(m_pBuffer);
     InitPointer(m_pSampleBuffer);
