@@ -104,7 +104,7 @@ typedef void (*RamChangedCallback) (void);
 
 #define GC_AUDIO_BUFFER_SIZE 8192
 
-#define GC_SAVESTATE_MAGIC 0x83190128
+#define GC_SAVESTATE_MAGIC 0x09200902
 
 struct GC_Color
 {
@@ -128,9 +128,11 @@ enum GC_Keys
     Keypad_8 = 0x01,
     Keypad_4 = 0x02,
     Keypad_5 = 0x03,
+    Key_Blue = 0x04,
     Keypad_7 = 0x05,
     Keypad_Hash = 0x06,
     Keypad_2 = 0x07,
+    Key_Purple = 0x08,
     Keypad_Asterisk = 0x09,
     Keypad_0 = 0x0A,
     Keypad_9 = 0x0B,

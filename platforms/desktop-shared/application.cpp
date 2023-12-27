@@ -43,6 +43,7 @@ static void sdl_shortcuts_gui(const SDL_Event* event);
 static void run_emulator(void);
 static void render(void);
 static void frame_throttle(void);
+static void save_window_size(void);
 
 int application_init(const char* arg)
 {
@@ -53,13 +54,10 @@ int application_init(const char* arg)
         Log ("Loading with argv: %s");
     }
 
-    int ret = sdl_init();
-
-    application_fullscreen = false;
-    
     config_init();
     config_read();
 
+    int ret = sdl_init();
     emu_init();
 
     strcpy(emu_savefiles_path, config_emulator.savefiles_path.c_str());
@@ -75,6 +73,9 @@ int application_init(const char* arg)
 
     SDL_GL_SetSwapInterval(config_video.sync ? 1 : 0);
 
+    if (config_emulator.fullscreen)
+        application_trigger_fullscreen(true);
+
     if (IsValidPointer(arg) && (strlen(arg) > 0))
     {
         gui_load_rom(arg);
@@ -85,6 +86,7 @@ int application_init(const char* arg)
 
 void application_destroy(void)
 {
+    save_window_size();
     config_write();
     config_destroy();
     renderer_destroy();
@@ -120,6 +122,10 @@ void application_trigger_fullscreen(bool fullscreen)
 
 static int sdl_init(void)
 {
+#ifdef _WIN32
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_SCALING, "1");
+#endif
+    
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
     {
         Log("Error: %s\n", SDL_GetError());
@@ -135,7 +141,8 @@ static int sdl_init(void)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    sdl_window = SDL_CreateWindow(GEARCOLECO_TITLE " " GEARCOLECO_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 770, 698, window_flags);
+
+    sdl_window = SDL_CreateWindow(GEARCOLECO_TITLE " " GEARCOLECO_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, config_emulator.window_width, config_emulator.window_height, window_flags);
     gl_context = SDL_GL_CreateContext(sdl_window);
     SDL_GL_MakeCurrent(sdl_window, gl_context);
     SDL_GL_SetSwapInterval(0);
@@ -230,6 +237,63 @@ static void sdl_events_emu(const SDL_Event* event)
 {
     switch(event->type)
     {
+        case (SDL_MOUSEMOTION):
+        {
+            if (config_emulator.spinner > 0)
+            {
+                int sen = config_emulator.spinner_sensitivity - 1;
+                if (sen < 0)
+                    sen = 0;
+                float senf = (float)(sen / 2.0f) + 1.0f;
+                float relx = (float)(event->motion.xrel) * senf;
+
+                // roller controller
+                switch (config_emulator.spinner)
+                {
+                    // SAC
+                    case (1):
+                    {
+                        emu_spinner1(-relx);
+                        break;
+                    }
+                    // Wheel
+                    case (2):
+                    {
+                        emu_spinner1(relx);
+                        break;
+                    }
+                    // Roller
+                    case (3):
+                    {
+                        float rely = (float)(event->motion.yrel) * senf;
+                        emu_spinner1(relx);
+                        emu_spinner2(rely);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+
+            break;
+        }
+        case (SDL_MOUSEWHEEL):
+        {
+            // SAC
+            if (config_emulator.spinner == 1)
+            {
+                int sen = (config_emulator.spinner_sensitivity - 1) * 20;
+                if (sen < 0)
+                    sen = 0;
+
+                float senf = (float)(sen / 2.0f) + 1.0f;
+                float rely = (float)(event->wheel.y) * senf;
+
+                emu_spinner2(rely);
+            }
+
+            break;
+        }
         case (SDL_DROPFILE):
         {
             char* dropped_filedir = event->drop.file;
@@ -440,8 +504,8 @@ static void sdl_events_emu(const SDL_Event* event)
 
             if (key == SDL_SCANCODE_F11)
             {
-                application_fullscreen = !application_fullscreen;
-                application_trigger_fullscreen(application_fullscreen);
+                config_emulator.fullscreen = !config_emulator.fullscreen;
+                application_trigger_fullscreen(config_emulator.fullscreen);
                 break;
             }
 
@@ -461,6 +525,10 @@ static void sdl_events_emu(const SDL_Event* event)
                     emu_key_pressed(controller, Key_Left_Button);
                 else if (key == config_input[i].key_right_button)
                     emu_key_pressed(controller, Key_Right_Button);
+                else if (key == config_input[i].key_blue)
+                    emu_key_pressed(controller, Key_Blue);
+                else if (key == config_input[i].key_purple)
+                    emu_key_pressed(controller, Key_Purple);
                 else if (key == config_input[i].key_0)
                     emu_key_pressed(controller, Keypad_0);
                 else if (key == config_input[i].key_1)
@@ -509,6 +577,10 @@ static void sdl_events_emu(const SDL_Event* event)
                     emu_key_released(controller, Key_Left_Button);
                 else if (key == config_input[i].key_right_button)
                     emu_key_released(controller, Key_Right_Button);
+                else if (key == config_input[i].key_blue)
+                    emu_key_released(controller, Key_Blue);
+                else if (key == config_input[i].key_purple)
+                    emu_key_released(controller, Key_Purple);
                 else if (key == config_input[i].key_0)
                     emu_key_released(controller, Keypad_0);
                 else if (key == config_input[i].key_1)
@@ -653,5 +725,16 @@ static void frame_throttle(void)
 
         if (elapsed < min)
             SDL_Delay((Uint32)(min - elapsed));
+    }
+}
+
+static void save_window_size(void)
+{
+    if (!config_emulator.fullscreen)
+    {
+        int width, height;
+        SDL_GetWindowSize(sdl_window, &width, &height);
+        config_emulator.window_width = width;
+        config_emulator.window_height = height;
     }
 }

@@ -142,6 +142,16 @@ void emu_key_released(GC_Controllers controller, GC_Keys key)
     gearcoleco->KeyReleased(controller, key);
 }
 
+void emu_spinner1(int movement)
+{
+    gearcoleco->Spinner1(movement);
+}
+
+void emu_spinner2(int movement)
+{
+    gearcoleco->Spinner2(movement);
+}
+
 void emu_pause(void)
 {
     gearcoleco->Pause(true);
@@ -311,6 +321,11 @@ void emu_debug_next_frame(void)
 void emu_load_bios(const char* file_path)
 {
     gearcoleco->GetMemory()->LoadBios(file_path);
+}
+
+void emu_video_no_sprite_limit(bool enabled)
+{
+    gearcoleco->GetVideo()->SetNoSpriteLimit(enabled);
 }
 
 static void save_ram(void)
