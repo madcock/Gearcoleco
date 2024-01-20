@@ -57,7 +57,7 @@ EXTERN bool emu_is_empty(void);
 EXTERN bool emu_is_bios_loaded(void);
 EXTERN void emu_reset(Cartridge::ForceConfiguration config);
 EXTERN void emu_dissasemble_rom(void);
-EXTERN void emu_audio_volume(float volume);
+EXTERN void emu_audio_mute(bool mute);
 EXTERN void emu_audio_reset(void);
 EXTERN bool emu_is_audio_enabled(void);
 EXTERN void emu_palette(GC_Color* palette);
@@ -77,6 +77,8 @@ EXTERN void emu_debug_next_frame(void);
 EXTERN void emu_load_bios(const char* file_path);
 EXTERN void emu_load_bios(const char* file_path);
 EXTERN void emu_video_no_sprite_limit(bool enabled);
+EXTERN void emu_set_overscan(int overscan);
+EXTERN void emu_save_screenshot(const char* file_path);
 
 #undef EMU_IMPORT
 #undef EXTERN

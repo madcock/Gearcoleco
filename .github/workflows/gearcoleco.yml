@@ -8,37 +8,47 @@ on:
 
 jobs:
   linux:
-    name: Linux
+    name: Linux (Ubuntu)
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Update OS
       run: sudo apt-get update -qq
     - name: Install dependencies
-      run: sudo apt-get install -y libsdl2-dev libglew-dev
+      run: sudo apt-get install -y libsdl2-dev libglew-dev libgtk-3-dev
     - name: make
       run: make
       working-directory: platforms/linux
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: Linux (Ubuntu) binary
+        path: platforms/linux/gearcoleco
   libretro:
     name: Libretro (Ubuntu)
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: make
       run: make
       working-directory: platforms/libretro
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: Libretro (Linux) core
+        path: platforms/libretro/gearcoleco_libretro.so
   macos:
     name: macOS
     runs-on: macOS-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Install dependencies
@@ -47,7 +57,7 @@ jobs:
       run: make dist
       working-directory: platforms/macos
     - name: Archive binary
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: macOS App bundle
         path: platforms/macos/Gearcoleco.app
@@ -56,36 +66,42 @@ jobs:
     runs-on: windows-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.2
+      uses: microsoft/setup-msbuild@v1.3.1
     - name: Get git version
       id: gitversion
-      run: echo "::set-output name=gitversion::$(git describe --abbrev=7 --dirty --always --tags)"
+      shell: bash
+      run: echo "gitversion=$(git describe --abbrev=7 --dirty --always --tags)" >> $GITHUB_OUTPUT
     - name: msbuild
       run: msbuild Gearcoleco.sln /t:Clean,Build /p:EmulatorBuild="${{ steps.gitversion.outputs.gitversion }}" /p:Configuration=Release
       working-directory: platforms/windows
     - name: Archive binary
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: Windows binary
         path: platforms/windows/release/Gearcoleco.exe
-#  bsd:
-#    name: FreeBSD
-#    runs-on: macos-12
-#    steps:
-#    - name: Checkout
-#      uses: actions/checkout@v2
-#      with:
-#        fetch-depth: 0
-#    - name: make
-#      id: test
-#      uses: vmactions/freebsd-vm@v0
-#      with:
-#        usesh: true
-#        prepare: pkg install -y git gmake pkgconf SDL2 glew lang/gcc
-#        run: |
-#          cd platforms/bsd
-#          gmake
+  bsd:
+    name: FreeBSD
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: make
+      id: test
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        prepare: pkg install -y git gmake pkgconf SDL2 glew lang/gcc gtk3
+        run: |
+          cd platforms/bsd
+          gmake
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: BSD (FreeBSD) binary
+        path: platforms/bsd/gearcoleco

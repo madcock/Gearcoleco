@@ -177,6 +177,7 @@ void config_read(void)
     config_emulator.window_height = read_int("Emulator", "WindowHeight", 600);
     config_emulator.spinner = read_int("Emulator", "Spinner", 0);
     config_emulator.spinner_sensitivity = read_int("Emulator", "SpinnerSensitivity", 4);
+    config_emulator.status_messages = read_bool("Emulator", "StatusMessages", false);
 
     if (config_emulator.savefiles_path.empty())
     {
@@ -194,14 +195,15 @@ void config_read(void)
     }
 
     config_video.scale = read_int("Video", "Scale", 0);
-    config_video.ratio = read_int("Video", "AspectRatio", 0);
+    config_video.ratio = read_int("Video", "AspectRatio", 1);
+    config_video.overscan = read_int("Video", "Overscan", 1);
     config_video.fps = read_bool("Video", "FPS", false);
     config_video.bilinear = read_bool("Video", "Bilinear", false);
     config_video.sprite_limit = read_bool("Video", "SpriteLimit", false);
     config_video.mix_frames = read_bool("Video", "MixFrames", true);
-    config_video.mix_frames_intensity = read_float("Video", "MixFramesIntensity", 0.30f);
+    config_video.mix_frames_intensity = read_float("Video", "MixFramesIntensity", 0.60f);
     config_video.scanlines = read_bool("Video", "Scanlines", true);
-    config_video.scanlines_intensity = read_float("Video", "ScanlinesIntensity", 0.40f);
+    config_video.scanlines_intensity = read_float("Video", "ScanlinesIntensity", 0.10f);
     config_video.palette = read_int("Video", "Palette", 0);
 
     for (int i = 0; i < 16; i++)
@@ -342,7 +344,8 @@ void config_write(void)
     write_int("Emulator", "WindowHeight", config_emulator.window_height);
     write_int("Emulator", "Spinner", config_emulator.spinner);
     write_int("Emulator", "SpinnerSensitivity", config_emulator.spinner_sensitivity);
-    
+    write_bool("Emulator", "StatusMessages", config_emulator.status_messages);
+
     for (int i = 0; i < config_max_recent_roms; i++)
     {
         std::string item = "RecentROM" + std::to_string(i);
@@ -351,6 +354,7 @@ void config_write(void)
 
     write_int("Video", "Scale", config_video.scale);
     write_int("Video", "AspectRatio", config_video.ratio);
+    write_int("Video", "Overscan", config_video.overscan);
     write_bool("Video", "FPS", config_video.fps);
     write_bool("Video", "Bilinear", config_video.bilinear);
     write_bool("Video", "SpriteLimit", config_video.sprite_limit);

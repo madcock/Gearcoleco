@@ -22,6 +22,7 @@
 #include "imgui/imgui_impl_sdl.h"
 #include "emu.h"
 #include "gui.h"
+#include "gui_debug.h"
 #include "config.h"
 #include "renderer.h"
 
@@ -40,19 +41,15 @@ static void sdl_destroy(void);
 static void sdl_events(void);
 static void sdl_events_emu(const SDL_Event* event);
 static void sdl_shortcuts_gui(const SDL_Event* event);
+static void handle_mouse_cursor(void);
 static void run_emulator(void);
 static void render(void);
 static void frame_throttle(void);
 static void save_window_size(void);
 
-int application_init(const char* arg)
+int application_init(const char* rom_file, const char* symbol_file)
 {
     Log ("<·> %s %s Desktop App <·>", GEARCOLECO_TITLE, GEARCOLECO_VERSION);
-
-    if (IsValidPointer(arg) && (strlen(arg) > 0))
-    {
-        Log ("Loading with argv: %s");
-    }
 
     config_init();
     config_read();
@@ -76,9 +73,16 @@ int application_init(const char* arg)
     if (config_emulator.fullscreen)
         application_trigger_fullscreen(true);
 
-    if (IsValidPointer(arg) && (strlen(arg) > 0))
+    if (IsValidPointer(rom_file) && (strlen(rom_file) > 0))
     {
-        gui_load_rom(arg);
+        Log ("Rom file argument: %s", rom_file);
+        gui_load_rom(rom_file);
+    }
+    if (IsValidPointer(symbol_file) && (strlen(symbol_file) > 0))
+    {
+        Log ("Symbol file argument: %s", symbol_file);
+        gui_debug_reset_symbols();
+        gui_debug_load_symbols_file(symbol_file);
     }
 
     return ret;
@@ -101,6 +105,7 @@ void application_mainloop(void)
     {
         frame_time_start = SDL_GetPerformanceCounter();
         sdl_events();
+        handle_mouse_cursor();
         run_emulator();
         render();
         frame_time_end = SDL_GetPerformanceCounter();
@@ -118,6 +123,11 @@ void application_trigger_quit(void)
 void application_trigger_fullscreen(bool fullscreen)
 {
     SDL_SetWindowFullscreen(sdl_window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+}
+
+void application_trigger_fit_to_content(int width, int height)
+{
+    SDL_SetWindowSize(sdl_window, width, height);
 }
 
 static int sdl_init(void)
@@ -147,7 +157,7 @@ static int sdl_init(void)
     SDL_GL_MakeCurrent(sdl_window, gl_context);
     SDL_GL_SetSwapInterval(0);
 
-    SDL_SetWindowMinimumSize(sdl_window, 770, 600);
+    SDL_SetWindowMinimumSize(sdl_window, 500, 300);
 
     application_gamepad_mappings = SDL_GameControllerAddMappingsFromRW(SDL_RWFromFile("gamecontrollerdb.txt", "rb"), 1);
 
@@ -211,6 +221,24 @@ static void sdl_destroy(void)
     SDL_Quit();
 }
 
+static void handle_mouse_cursor(void)
+{
+    bool hide_cursor = false;
+
+    if (gui_main_window_hovered && !config_debug.debug)
+        hide_cursor = true;
+
+    if (!config_emulator.show_menu && !config_debug.debug)
+        hide_cursor = true;
+
+    if (hide_cursor)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+    else
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+
+    SDL_SetRelativeMouseMode(config_emulator.capture_mouse ? SDL_TRUE : SDL_FALSE);
+}
+
 static void sdl_events(void)
 {
     SDL_Event event;
@@ -253,30 +281,30 @@ static void sdl_events_emu(const SDL_Event* event)
                     // SAC
                     case (1):
                     {
-                        emu_spinner1(-relx);
+                        emu_spinner1((int)-relx);
                         break;
                     }
                     // Wheel
                     case (2):
                     {
-                        emu_spinner1(relx);
+                        emu_spinner1((int)relx);
                         break;
                     }
                     // Roller
                     case (3):
                     {
                         float rely = (float)(event->motion.yrel) * senf;
-                        emu_spinner1(relx);
-                        emu_spinner2(rely);
+                        emu_spinner1((int)relx);
+                        emu_spinner2((int)rely);
                         break;
                     }
                     default:
                         break;
                 }
             }
-
-            break;
         }
+        break;
+
         case (SDL_MOUSEWHEEL):
         {
             // SAC
@@ -289,18 +317,45 @@ static void sdl_events_emu(const SDL_Event* event)
                 float senf = (float)(sen / 2.0f) + 1.0f;
                 float rely = (float)(event->wheel.y) * senf;
 
-                emu_spinner2(rely);
+                emu_spinner2((int)rely);
             }
-
-            break;
         }
+        break;
+
+        case (SDL_MOUSEBUTTONDOWN):
+        {
+            // Roller
+            if ((config_emulator.spinner == 3) && !config_debug.debug && !gui_main_menu_hovered)
+            {
+                if (event->button.button == SDL_BUTTON_LEFT)
+                    emu_key_pressed(Controller_1, Key_Left_Button);
+                else if (event->button.button == SDL_BUTTON_RIGHT)
+                    emu_key_pressed(Controller_1, Key_Right_Button);
+            }
+        }
+        break;
+
+        case (SDL_MOUSEBUTTONUP):
+        {
+            // Roller
+            if ((config_emulator.spinner == 3) && !config_debug.debug)
+            {
+                if (event->button.button == SDL_BUTTON_LEFT)
+                    emu_key_released(Controller_1, Key_Left_Button);
+                else if (event->button.button == SDL_BUTTON_RIGHT)
+                    emu_key_released(Controller_1, Key_Right_Button);
+            }
+        }
+        break;
+
         case (SDL_DROPFILE):
         {
             char* dropped_filedir = event->drop.file;
             gui_load_rom(dropped_filedir);
             SDL_free(dropped_filedir);    // Free dropped_filedir memory
-            break;
         }
+        break;
+
         case SDL_WINDOWEVENT:
         {
             switch (event->window.event)
@@ -509,6 +564,12 @@ static void sdl_events_emu(const SDL_Event* event)
                 break;
             }
 
+            if (key == SDL_SCANCODE_F12)
+            {
+                config_emulator.capture_mouse = !config_emulator.capture_mouse;
+                break;
+            }
+
             for (int i = 0; i < 2; i++)
             {
                 GC_Controllers controller = (i == 0) ? Controller_1 : Controller_2;
@@ -636,6 +697,9 @@ static void sdl_shortcuts_gui(const SDL_Event* event)
                 break;
             case SDL_SCANCODE_S:
                 gui_shortcut(gui_ShortcutSaveState);
+                break;
+            case SDL_SCANCODE_X:
+                gui_shortcut(gui_ShortcutScreenshot);
                 break;
             case SDL_SCANCODE_M:
                 gui_shortcut(gui_ShortcutShowMainMenu);
