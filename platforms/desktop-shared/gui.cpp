@@ -19,7 +19,6 @@
 
 #include <math.h>
 #include "imgui/imgui.h"
-#include "imgui/imgui_memory_editor.h"
 #include "imgui/fonts/RobotoMedium.h"
 #include "nfd/nfd.h"
 #include "config.h"
@@ -211,6 +210,12 @@ void gui_shortcut(gui_ShortCutEvent event)
     case gui_ShortcutDebugGoBack:
         if (config_debug.debug)
             gui_debug_go_back();
+        break;
+    case gui_ShortcutDebugCopy:
+        gui_debug_copy_memory();
+        break;
+    case gui_ShortcutDebugPaste:
+        gui_debug_paste_memory();
         break;
     case gui_ShortcutShowMainMenu:
         config_emulator.show_menu = !config_emulator.show_menu;
@@ -432,8 +437,6 @@ static void main_menu(void)
 
             if (ImGui::BeginMenu("BIOS"))
             {
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("When the BIOS is enabled it will execute as in original hardware,\ncausing invalid roms to lock or preventing some other to boot.\n\nSet 'Media Slot' to 'None' in order to boot the games included in BIOS.");
                 if (ImGui::MenuItem("Load BIOS..."))
                 {
                     open_bios = true;
@@ -1281,12 +1284,12 @@ static void popup_modal_keyboard()
 {
     if (ImGui::BeginPopupModal("Keyboard Configuration", NULL, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("Press any key...\n\n");
+        ImGui::Text("Press any key to assign...\n\n");
         ImGui::Separator();
 
-        for (int i = 0; i < IM_ARRAYSIZE(ImGui::GetIO().KeysDown); i++)
+        for ( int i = 0; i < ImGuiKey_NamedKey_END; ++i )
         {
-            if (ImGui::IsKeyPressed(i))
+            if (ImGui::IsKeyDown((ImGuiKey)i))
             {
                 SDL_Scancode key = (SDL_Scancode)i;
 
@@ -1366,32 +1369,54 @@ static void popup_modal_about(void)
         }
 
         ImGui::Separator();
-        
-        #ifdef _WIN64
+
+        #if defined(_M_ARM64)
+        ImGui::Text("Windows ARM64 build");
+        #endif
+        #if defined(_M_X64)
         ImGui::Text("Windows 64 bit build");
-        #elif defined(_WIN32)
+        #endif
+        #if defined(_M_IX86)
         ImGui::Text("Windows 32 bit build");
         #endif
-        #ifdef __linux__
-        ImGui::Text("Linux build");
+        #if defined(__linux__) && defined(__x86_64__)
+        ImGui::Text("Linux 64 bit build");
         #endif
-        #ifdef __APPLE__
-        ImGui::Text("macOS build");
+        #if defined(__linux__) && defined(__i386__)
+        ImGui::Text("Linux 32 bit build");
         #endif
-        #ifdef _MSC_VER
-        ImGui::Text("Microsoft C++ %d.", _MSC_VER);
+        #if defined(__linux__) && defined(__arm__)
+        ImGui::Text("Linux ARM build");
         #endif
-        #ifdef __MINGW32__
+        #if defined(__linux__) && defined(__aarch64__)
+        ImGui::Text("Linux ARM64 build");
+        #endif
+        #if defined(__APPLE__) && defined(__arm64__ )
+        ImGui::Text("macOS build (Apple Silicon)");
+        #endif
+        #if defined(__APPLE__) && defined(__x86_64__)
+        ImGui::Text("macOS build (Intel)");
+        #endif
+        #if defined(_MSC_FULL_VER)
+        ImGui::Text("Microsoft C++ %d", _MSC_FULL_VER);
+        #endif
+        #if defined(__CLR_VER)
+        ImGui::Text("CLR version: %d", __CLR_VER);
+        #endif
+        #if defined(__MINGW32__)
         ImGui::Text("MinGW 32 bit (%d.%d)", __MINGW32_MAJOR_VERSION, __MINGW32_MINOR_VERSION);
         #endif
-        #ifdef __MINGW64__
+        #if defined(__MINGW64__)
         ImGui::Text("MinGW 64 bit (%d.%d)", __MINGW64_VERSION_MAJOR, __MINGW64_VERSION_MINOR);
         #endif
         #if defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER)
         ImGui::Text("GCC %d.%d.%d", (int)__GNUC__, (int)__GNUC_MINOR__, (int)__GNUC_PATCHLEVEL__);
         #endif
-        #ifdef __clang_version__
+        #if defined(__clang_version__)
         ImGui::Text("Clang %s", __clang_version__);
+        #endif
+        #if defined(__TIMESTAMP__)
+        ImGui::Text("Generated on: %s", __TIMESTAMP__);
         #endif
 
         ImGui::Separator();
@@ -1579,6 +1604,7 @@ static void menu_ffwd(void)
 
 static void show_info(void)
 {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
     ImGui::Begin("ROM Info", &config_emulator.show_info, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
     static char info[512];
@@ -1592,6 +1618,7 @@ static void show_info(void)
     ImGui::PopFont();
 
     ImGui::End();
+    ImGui::PopStyleVar();
 }
 
 static void show_fps(void)
